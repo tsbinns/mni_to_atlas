@@ -4,8 +4,8 @@ A simple tool for finding brain atlas regions based on MNI coordinates, with bas
 Currently, the automated anatomical labelling (AAL) atlas [1] and AAL3 atlas [2] are supported.
 
 ## Use Example:
-Markup : 1) Create an instance of the *AtlasBrowser* class and specify an atlas to use, e.g. *atlas = AtlasBrowser("AAL3")*.
-         2) Provide MNI coordinates to the *AtlasBrowser* object to find the corresponding atlas regions, e.g. *regions = atlas.find_regions(coordinates)*, where coordinates is a list of lists, where each nested list contains an x-, y-, and z-axis MNI coordinate. The *regions* output is a list of strings containing the region names for each set of coordinates.
+Markup : 1. Create an instance of the *AtlasBrowser* class and specify an atlas to use, e.g. *atlas = AtlasBrowser("AAL3")*.
+         2. Provide MNI coordinates to the *AtlasBrowser* object to find the corresponding atlas regions, e.g. *regions = atlas.find_regions(coordinates)*, where coordinates is a list of lists, where each nested list contains an x-, y-, and z-axis MNI coordinate. The *regions* output is a list of strings containing the region names for each set of coordinates.
              * By default, plotting the coordinates is not performed, however this can be changed by setting *plot = True* in the *find_regions* method, e.g. *atlas.find_regions(coordinates, plot=True)*. In this case, a figure will be generated for each set of coordinates.
 
 ## References:
