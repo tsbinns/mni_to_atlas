@@ -3,6 +3,7 @@ A simple tool for finding brain atlas regions based on MNI coordinates, with bas
 
 Currently, the automated anatomical labelling (AAL) atlas [1] and AAL3 atlas [2] are supported.
 
+Example screenshot:
 ![image](https://user-images.githubusercontent.com/56922019/178039475-998e077b-482f-4fbe-94af-88e1891b493b.png)
 
 ## Use Example:
