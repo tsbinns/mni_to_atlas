@@ -99,7 +99,9 @@ class AtlasBrowser:
     def find_regions(
         self, coordinates: list[list[Union[int, float]]], plot: bool = False
     ) -> list[str]:
-        """Finds the regions associated with MNI coordinates for the atlas.
+        """Finds the regions associated with MNI coordinates for the atlas. If a
+        set of coordinates does not correspond to a mapped region, 'undefined'
+        is returned.
 
         PARAMETERS
         ----------
@@ -112,6 +114,12 @@ class AtlasBrowser:
         plot : bool; default False
         -   Whether or not to plot a sagittal, coronal, and axial view of the
             coordinate on the atlas.
+
+        RETURNS
+        -------
+        regions : list[str]
+        -   Names of the regions in the atlas corresponding to the MNI
+            coordinates.
         """
         self._check_coordinates(coordinates)
         if plot and not self._plotting_ready:
@@ -284,7 +292,8 @@ class AtlasBrowser:
 
     def _find_region(self, atlas_coords: list[int]) -> str:
         """Finds the name of the region in the atlas belonging to a set of
-        coordinates.
+        coordinates. If the coordinates do not correspond to a mapped region,
+        'undefined' is returned.
 
         PARAMETERS
         ----------
@@ -293,13 +302,17 @@ class AtlasBrowser:
 
         RETURNS
         -------
-        str
+        region : str
         -   The name of the region corresponding to the coordinates.
         """
         region_id = int(
             self._atlas[atlas_coords[0], atlas_coords[1], atlas_coords[2]]
         )
-        return self._region_names[region_id]
+        if region_id != 0:
+            region = self._region_names[region_id]
+        else:
+            region = "undefined"
+        return region
 
     def _plot(
         self, atlas_coords: list[int], mni_coords: list[int], region: str
@@ -555,8 +568,3 @@ class AtlasBrowser:
         """
         for axis in axes:
             axis.axis("off")
-
-
-atlas = AtlasBrowser("AAL3")
-regions = atlas.find_regions([[-23.5, -53, 72.5]], plot=False)
-print("jeff")
