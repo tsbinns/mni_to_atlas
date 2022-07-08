@@ -552,8 +552,8 @@ class AtlasBrowser:
         -   The coordinates in the atlas space.
         """
         title = (
-            f"Region: {region}\nMNI coords.: {mni_coords}     "
-            f"Atlas coords.: {atlas_coords}"
+            f"Region: {region}     Atlas: {self.atlas_name}\nMNI coords.: "
+            f"{mni_coords}     Atlas coords.: {atlas_coords}"
         )
         fig.suptitle(title)
 
