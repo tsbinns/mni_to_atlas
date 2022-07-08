@@ -7,7 +7,7 @@ Example screenshot of the plotting:
 ![image](https://user-images.githubusercontent.com/56922019/178039475-998e077b-482f-4fbe-94af-88e1891b493b.png)
 
 ## Use Example:
-1. Import the `AtlasBrowser` class from `atlas_browser.py` into your workspace.
+1. Import the `AtlasBrowser` class from `atlas_browser.py` into your workspace, e.g. `from atlas_browser import AtlasBrowser`.
 2. Create an instance of the `AtlasBrowser` class and specify an atlas to use, e.g. `atlas = AtlasBrowser("AAL3")`.
 3. Provide MNI coordinates to the `AtlasBrowser` object to find the corresponding atlas regions, e.g. `regions = atlas.find_regions(coordinates)`, where coordinates is a list of lists, where each nested list contains an x-, y-, and z-axis MNI coordinate. The `regions` output is a list of strings containing the region names for each set of coordinates.
    - By default, plotting the coordinates is not performed, however this can be changed by setting `plot = True` in the `find_regions` method, e.g. `atlas.find_regions(coordinates, plot=True)`. In this case, a figure will be generated for each set of coordinates.
