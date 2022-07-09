@@ -13,5 +13,5 @@ Example screenshot of the plotting:
    - By default, plotting the coordinates is not performed, however this can be changed by setting `plot = True` in the `find_regions` method, e.g. `atlas.find_regions(coordinates, plot=True)`. In this case, a figure will be generated for each set of coordinates.
 
 ## References:
-1. [Tzourio-Mazoyer et al. (2002), NeuroImage, 10.1006/nimg.2001.0978](https://www.sciencedirect.com/science/article/pii/S1053811901909784).
-2. [Rolls et al. (2020), NeuroImage, 10.1016/j.neuroimage.2019.116189](https://www.sciencedirect.com/science/article/pii/S1053811919307803).
+1. [Tzourio-Mazoyer *et al.* (2002), NeuroImage, 10.1006/nimg.2001.0978](https://www.sciencedirect.com/science/article/pii/S1053811901909784).
+2. [Rolls *et al.* (2020), NeuroImage, 10.1016/j.neuroimage.2019.116189](https://www.sciencedirect.com/science/article/pii/S1053811919307803).
