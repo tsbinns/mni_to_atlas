@@ -1,7 +1,7 @@
 # mni_to_region
 A simple Python-based tool for finding brain atlas regions based on MNI coordinates, with basic plotting abilities to show the sagittal, coronal, and axial views of the coordinates on the atlas.
 
-Currently, the automated anatomical labelling (AAL) atlas [1] and AAL3 atlas [2] are supported.
+Currently, the automated anatomical labelling (AAL) atlas [1](#References) and AAL3 atlas [2](#References) are supported.
 
 Example screenshot of the plotting:
 ![image](https://user-images.githubusercontent.com/56922019/178039475-998e077b-482f-4fbe-94af-88e1891b493b.png)
