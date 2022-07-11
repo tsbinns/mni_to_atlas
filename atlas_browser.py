@@ -23,6 +23,13 @@ class AtlasBrowser:
     -   Supported atlases are: "AAL" (automated anatomical labelling atlas [1]);
         and "AAL3" (automated anatomical labeling atlas 3 [2]; 1x1x1 mm voxel
         version).
+    
+    METHODS
+    -------
+    find_regions
+    -   Finds the regions associated with MNI coordinates for the atlas. If a
+        set of coordinates does not correspond to a mapped region, 'undefined'
+        is returned.
 
     NOTES
     -----
