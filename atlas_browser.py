@@ -23,7 +23,7 @@ class AtlasBrowser:
     -   Supported atlases are: "AAL" (automated anatomical labelling atlas [1]);
         and "AAL3" (automated anatomical labeling atlas 3 [2]; 1x1x1 mm voxel
         version).
-    
+
     METHODS
     -------
     find_regions
