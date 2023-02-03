@@ -2,14 +2,13 @@
 
 from os.path import join as pathjoin
 import random
-from typing import Union
 import json
 import csv
 import nibabel as nib
 import numpy as np
-from numpy.typing import NDArray
 from matplotlib.figure import Figure
 from matplotlib import pyplot as plt
+from mni_to_atlas import atlases
 
 
 class AtlasBrowser:
@@ -28,7 +27,7 @@ class AtlasBrowser:
     -------
     find_regions
     -   Finds the regions associated with MNI coordinates for the atlas. If a
-        set of coordinates does not correspond to a mapped region, 'undefined'
+        set of coordinates does not correspond to a mapped region, "undefined"
         is returned.
 
     NOTES
@@ -38,19 +37,22 @@ class AtlasBrowser:
         [2] Rolls et al. (2020), NeuroImage, 10.1016/j.neuroimage.2019.116189.
     """
 
+    ## Initialise atlases path
+    _atlases_path = atlases.__path__[0]
+
+    ### Initialise status attributes
+    _plotting_ready = False
+
+    ### Initialise attributes that will be filled with information
+    _atlas = None
+    _plotting_atlas = None
+    _conversion = None
+    _region_names = None
+    _region_colours = None
+
     def __init__(self, atlas: str) -> None:
         ### Initialise inputs
         self.atlas_name = atlas
-
-        ### Initialise status attributes
-        self._plotting_ready = False
-
-        ### Initialise attributes that will be filled with information
-        self._atlas = None
-        self._plotting_atlas = None
-        self._conversion = None
-        self._region_names = None
-        self._region_colours = None
 
         ### Begin work
         self._check_atlas()
@@ -73,7 +75,7 @@ class AtlasBrowser:
 
     def _load_data(self) -> None:
         """Loads the atlas and accompanying information into the object."""
-        self._path = pathjoin("atlases", self.atlas_name)
+        self._path = pathjoin(self._atlases_path, self.atlas_name)
         self._load_atlas()
         self._load_conversion()
         self._load_regions()
@@ -104,19 +106,19 @@ class AtlasBrowser:
                 self._region_colours[region_id] = colour_group
 
     def find_regions(
-        self, coordinates: list[list[Union[int, float]]], plot: bool = False
+        self, coordinates: np.ndarray, plot: bool = False
     ) -> list[str]:
         """Finds the regions associated with MNI coordinates for the atlas. If a
-        set of coordinates does not correspond to a mapped region, 'undefined'
+        set of coordinates does not correspond to a mapped region, "undefined"
         is returned.
 
         PARAMETERS
         ----------
-        coordinates : list[list[int | float]]
-        -   MNI coordinates (in mm) to find the associated atlas regions for.
-        -   Must be a list of sublists in which each sublist contains an x-, y-,
-            and z-coordinate. A corresponding region will be returned for each
-            sublist of coordinates.
+        coordinates : numpy ndarray
+        -   MNI coordinates (in mm) to find the associated atlas regions for,
+            given as an [n x 3] matrix where n is the number of coordinates to
+            find regions for, and 3 the x-, y-, and z-axis coordinates,
+            respectively.
 
         plot : bool; default False
         -   Whether or not to plot a sagittal, coronal, and axial view of the
@@ -128,7 +130,7 @@ class AtlasBrowser:
         -   Names of the regions in the atlas corresponding to the MNI
             coordinates.
         """
-        self._check_coordinates(coordinates)
+        coordinates = self._check_coordinates(coordinates)
         if plot and not self._plotting_ready:
             self._prepare_plotting()
 
@@ -143,31 +145,50 @@ class AtlasBrowser:
 
         return regions
 
-    def _check_coordinates(
-        self, coordinates: list[list[Union[int, float]]]
-    ) -> None:
+    def _check_coordinates(self, coordinates: np.ndarray) -> np.ndarray:
         """Checks that each set of coordinates contains three values,
         corresponding to the x-, y-, and z-coordinates.
 
         PARAMETERS
         ----------
-        coordinates : list[list[int | float]]
-        -   A list of sublists in which each sublist contains an x-, y-, and
-            z-coordinate.
+        coordinates : numpy ndarray
+        -   An [n x 3] or [3, 0] matrix where n is the number of coordinates to
+            find regions for, and 3 the x-, y-, and z-axis coordinates,
+            respectively.
+        
+        RETURNS
+        -------
+        coordinates : numpy ndarray
+        -   An [n x 3] matrix where n is the number of coordinates to
+            find regions for, and 3 the x-, y-, and z-axis coordinates,
+            respectively.
 
         RAISES
         ------
         ValueError
-        -   Raised if a set of coordinates does not have three values.
+        -   Raised if 'coordinates' is not a numpy ndarray.
+        -   Raised if 'coordinates' has more than two dimensions.
+        -   Raised if the second dimension of 'coordinates' does not have a
+            length of 3.
         """
-        for coord_i, coords in enumerate(coordinates):
-            if len(coords) != 3:
-                raise ValueError(
-                    "Each set of coordinates must have three values, "
-                    "corresponding to the x-, y-, and z-coordinates, "
-                    "respectively, however this is not the case for the "
-                    f"coordinates {coords} in position {coord_i}."
-                )
+        if not isinstance(coordinates, np.ndarray):
+            raise TypeError("'coordinates' should be a numpy ndarray.")
+        
+        if coordinates.ndim == 1 and coordinates.shape == (3,):
+            coordinates = coordinates.copy()[np.newaxis, :]
+
+        if coordinates.ndim != 2:
+            raise ValueError(
+                "'coordinates' should be an [n x 3] array, but it has "
+                f"{coordinates.ndim} dimensions."
+            )
+
+        if coordinates.shape[1] != 3:
+            raise ValueError(
+                "'coordinates' should be an [n x 3] array, but it is an "
+                f"[n x {coordinates.shape[1]}] array.")
+        
+        return coordinates
 
     def _prepare_plotting(self) -> None:
         """Prepares the atlas for being plotted."""
@@ -177,7 +198,7 @@ class AtlasBrowser:
         self._plotting_atlas = self._assign_colour_ids(plotting_atlas)
         self._plotting_ready = True
 
-    def _assign_colour_ids(self, atlas: NDArray) -> NDArray:
+    def _assign_colour_ids(self, atlas: np.ndarray) -> np.ndarray:
         """Shuffles the colour group values of regions belonging to the same
         colour groups and assigns these new values to the plotting atlas as the
         region IDs.
@@ -204,6 +225,7 @@ class AtlasBrowser:
             share the same colour across both hemispheres.
         """
         transformation = self._define_colour_reassignment()
+
         return self._reassign_colours(atlas, transformation)
 
     def _define_colour_reassignment(self) -> dict:
@@ -222,11 +244,12 @@ class AtlasBrowser:
         transformation = {}
         for region_id, colour_id in self._region_colours.items():
             transformation[region_id] = shuffled_ids[colour_id - 1]
+
         return transformation
 
     def _reassign_colours(
-        self, atlas: NDArray, transformation: dict
-    ) -> NDArray:
+        self, atlas: np.ndarray, transformation: dict
+    ) -> np.ndarray:
         """Assigns new colour ID values as the region IDs in the atlas.
 
         PARAMETERS
@@ -247,20 +270,21 @@ class AtlasBrowser:
         for val_i, val in enumerate(atlas_1d):
             if not np.isnan(val):
                 atlas_1d[val_i] = transformation[val]
+
         return atlas_1d.reshape(atlas.shape)
 
-    def _convert_coords(self, mni_coords: list[int]) -> list[int]:
+    def _convert_coords(self, mni_coords: np.ndarray) -> np.ndarray:
         """Converts MNI coordinates (in mm) to atlas coordinates.
 
         PARAMETERS
         ----------
-        mni_coords : list[int]
+        mni_coords : numpy ndarray
         -   MNI coordinates (in mm) as integers, consisting of an x-, y-, and
             z-coordinate.
 
         RETURNS
         -------
-        atlas_coords : list[int]
+        atlas_coords : numpy ndarray
         -   Atlas coordinates consiting of an x-, y-, and z-coordinate.
 
         NOTES
@@ -269,70 +293,67 @@ class AtlasBrowser:
             coordinates must be rounded in the case of non-integer values before
             finding the corresponding region.
         """
-        atlas_coords = []
-        for offset, coord in zip(self._conversion, mni_coords):
-            atlas_coords.append(coord + offset)
-        return atlas_coords
+        return mni_coords + self._conversion
 
-    def _round_coords(self, coords: list[Union[int, float]]) -> list[int]:
+    def _round_coords(self, coords: np.ndarray) -> np.ndarray:
         """Rounds coordinates to the nearest integer.
 
         PARAMETERS
         ----------
-        coords : list[int | float]
-        -   A list of coordinates, consisting of an x-, y-, and z-coordinate.
+        coords : numpy ndarray
+        -   A [1 x 3] array, consisting of an x-, y-, and z-coordinate.
 
         RETURNS
         -------
-        rounded_coords : list[int]
-        -   A list of coordinates, consisting of an x-, y-, and z-coordinate
+        rounded_coords : numpy ndarray
+        -   An array of length three, consisting of an x-, y-, and z-coordinate
             rounded to their nearest integer.
         """
-        rounded_coords = []
-        for coord in coords:
+        rounded_coords = np.zeros((3,), dtype=int)
+        for coord_i, coord in enumerate(coords):
             if coord < 0:
                 rounded = int(coord - 0.5)
             else:
                 rounded = int(coord + 0.5)
-            rounded_coords.append(rounded)
+            rounded_coords[coord_i] = rounded
+
         return rounded_coords
 
-    def _find_region(self, atlas_coords: list[int]) -> str:
+    def _find_region(self, atlas_coords: np.ndarray) -> str:
         """Finds the name of the region in the atlas belonging to a set of
         coordinates. If the coordinates do not correspond to a mapped region,
         'undefined' is returned.
 
         PARAMETERS
         ----------
-        atlas_coords : list[int]
-        -   Atlas coordinates, consisting of an x-, y-, and z-coordinate.
+        atlas_coords : numpy ndarray
+        -   A [1 x 3] array, consisting of an x-, y-, and z-coordinate.
 
         RETURNS
         -------
         region : str
         -   The name of the region corresponding to the coordinates.
         """
-        region_id = int(
-            self._atlas[atlas_coords[0], atlas_coords[1], atlas_coords[2]]
-        )
+        region_id = int(self._atlas[*atlas_coords])
         if region_id != 0:
             region = self._region_names[region_id]
         else:
             region = "undefined"
+
         return region
 
     def _plot(
-        self, atlas_coords: list[int], mni_coords: list[int], region: str
+        self, atlas_coords: np.ndarray, mni_coords: np.ndarray, region: str
     ) -> None:
         """Plots coordinates on the atlas in the sagittal, coronal, and axial
         views.
 
         PARAMETERS
         ----------
-        atlas_coords : list[int]
+        atlas_coords : numpy ndarray
         -   Atlas coordinates, consisting of an x-, y-, and z-coordinate.
 
-        mni_coords : list[int]
+        mni_coords : numpy ndarray
         -  The atlas coordinates in MNI space.
 
         region : str
@@ -344,7 +365,7 @@ class AtlasBrowser:
         plt.show()
 
     def _plot_views(
-        self, axes: list[plt.Axes], atlas_coords: list[int]
+        self, axes: list[plt.Axes], atlas_coords: np.ndarray
     ) -> None:
         """Plots a sagittal, coronal, and axial view of atlas coordinates on a
         set of axes.
@@ -355,7 +376,7 @@ class AtlasBrowser:
         -   A list of three axes to plot the sagittal, coronal, and axial view
             of the coordinates, respectively.
 
-        atlas_coords : list[int]
+        atlas_coords : numpy ndarray
         -   Atlas coordinates, consisting of an x-, y-, and z-coordinate.
         """
         sagittal, coronal, axial = self._get_plot_views(atlas_coords)
@@ -374,14 +395,14 @@ class AtlasBrowser:
         )
 
     def _get_plot_views(
-        self, atlas_coords: list[int]
-    ) -> tuple[NDArray, NDArray, NDArray]:
+        self, atlas_coords: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Gets the sagittal, coronal, and axial views of the atlas at the
         specified coordinates.
 
         PARAMETERS
         ----------
-        atlas_coords : list[int]
+        atlas_coords : numpy ndarray
         -   Atlas coordinates, consisting of an x-, y-, and z-coordinate.
 
         RETURNS
@@ -398,15 +419,18 @@ class AtlasBrowser:
         sagittal = np.rot90(self._plotting_atlas[atlas_coords[0], :, :])
         coronal = np.rot90(self._plotting_atlas[:, atlas_coords[1], :])
         axial = np.rot90(self._plotting_atlas[:, :, atlas_coords[2]])
+
         return sagittal, coronal, axial
 
-    def _get_corrected_coords(self, atlas_coords: list[int]) -> tuple[int, int]:
+    def _get_corrected_coords(
+        self, atlas_coords: np.ndarray
+    ) -> tuple[int, int]:
         """Gets the corrected y- and z-coordinates used for plotting a marker of
         the coordinate location on the plots.
 
         PARAMETERS
         ----------
-        atlas_coords : list[int]
+        atlas_coords : numpy ndarray
         -   Atlas coordinates, consisting of an x-, y-, and z-coordinate.
 
         RETURNS
@@ -419,14 +443,15 @@ class AtlasBrowser:
         """
         corrected_y = self._plotting_atlas.shape[1] - atlas_coords[1]
         corrected_z = self._plotting_atlas.shape[2] - atlas_coords[2]
+
         return corrected_y, corrected_z
 
     def _style_plot(
         self,
         fig: Figure,
         axes: list[plt.Axes],
-        atlas_coords: list[int],
-        mni_coords: list[int],
+        atlas_coords: np.ndarray,
+        mni_coords: np.ndarray,
         region: str,
     ) -> None:
         """Adds additional information to the subplots.
@@ -440,10 +465,10 @@ class AtlasBrowser:
         -   A list of three axes to plot the sagittal, coronal, and axial view
             of the coordinates, respectively.
 
-        atlas_coords : list[int]
+        atlas_coords : numpy ndarray
         -   The coordinates in the atlas space.
 
-        mni_coords : list[int]
+        mni_coords : numpy ndarray
         -   The coordinates in MNI space.
 
         region : str
@@ -491,7 +516,7 @@ class AtlasBrowser:
 
     def _get_orientation_label_positions(
         self, axes: list[plt.Axes]
-    ) -> tuple[list[int], int, list[int], int]:
+    ) -> tuple[np.ndarray, float, np.ndarray, float]:
         """Gets the figure coordinates for the orientation labels that will be
         added to the figure.
 
@@ -503,43 +528,48 @@ class AtlasBrowser:
 
         RETURNS
         -------
-        x_left : list[int]
+        x_left : numpy ndarray
         -   Three x-coordinate figure positions, one for each subplot,
             corresponding to the left of each subplot.
 
-        y_left : int
+        y_left : float
         -   The average y-coordinate figure position of the center of each
             subplot.
 
-        x_top : list[int]
+        x_top : numpy ndarray
         -   Three x-coordinate figure positions, one for each subplot,
             corresponding to the center of each subplot.
 
-        y_top : int
+        y_top : float
         -   The average y-coordinate figure position of the top of each subplot.
         """
-        x_left = []
-        y_left = []
-        x_top = []
-        y_top = []
-        for axis in axes:
+        x_left = np.zeros((3,))
+        y_left = np.zeros((3,))
+        x_top = np.zeros((3,))
+        y_top = np.zeros((3,))
+        for axis_i, axis in enumerate(axes):
             bounds = axis.get_position().bounds
-            x_left.append(bounds[0])  # x position
-            y_left.append(
-                bounds[1] + (bounds[3] / 2)
-            )  # y position + half height
-            x_top.append(bounds[0] + (bounds[2] / 2))  # x position + half width
-            y_top.append(bounds[1] + bounds[3])  # y position + height
-        y_left = np.mean(y_left)
-        y_top = np.mean(y_top)
+            if axis_i == 0:
+                x_shift = 0.2
+            else:
+                x_shift = 0
+            x_left[axis_i] = bounds[0] - bounds[0] * x_shift # x position
+            y_left[axis_i] = bounds[1] + (bounds[3] / 2)  # y position + half
+            # height
+            x_top[axis_i] = bounds[0] + (bounds[2] / 2)  # x position + half
+            # width
+            y_top[axis_i] = bounds[1] + bounds[3]  # y position + height
+        y_left = y_left.mean()
+        y_top = y_top.mean()
+
         return x_left, y_left, x_top, y_top + (y_top / 20)
 
     def _add_title(
         self,
         fig: Figure,
         region: str,
-        mni_coords: list[int],
-        atlas_coords: list[int],
+        mni_coords: np.ndarray,
+        atlas_coords: np.ndarray,
     ) -> None:
         """Generates a title for the figure containing the MNI and atlas
         coordinates, and the corresponding region.
@@ -552,15 +582,15 @@ class AtlasBrowser:
         region : str
         -   The name of the region corresponding to the coordinates.
 
-        mni_coords : list[int]
+        mni_coords : numpy ndarray
         -   The coordinates in MNI space.
 
-        atlas_coords : list[int]
+        atlas_coords : numpy ndarray
         -   The coordinates in the atlas space.
         """
         title = (
             f"Region: {region}     Atlas: {self.atlas_name}\nMNI coords.: "
-            f"{mni_coords}     Atlas coords.: {atlas_coords}"
+            f"{mni_coords.tolist()}     Atlas coords.: {atlas_coords.tolist()}"
         )
         fig.suptitle(title)
 
