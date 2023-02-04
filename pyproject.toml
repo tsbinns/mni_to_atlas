@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mni_to_atlas"
-version = "0.3"
+version = "0.4"
 authors = [
   { name="Thomas Samuel Binns", email="t.s.binns@outlook.com" },
 ]
