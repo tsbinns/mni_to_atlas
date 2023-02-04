@@ -1,4 +1,4 @@
-"""A class and methods for converting MNI coordinates to atlas regions."""
+"""A class for converting MNI coordinates to atlas regions."""
 
 from os.path import join as pathjoin
 import random
@@ -37,7 +37,8 @@ class AtlasBrowser:
         [2] Rolls et al. (2020), NeuroImage, 10.1016/j.neuroimage.2019.116189.
     """
 
-    ## Initialise atlases path
+    ## Initialise class information
+    supported_atlases = ["AAL", "AAL3"]
     _atlases_path = atlases.__path__[0]
 
     ### Initialise status attributes
@@ -63,14 +64,13 @@ class AtlasBrowser:
 
         RAISES
         ------
-        NotImplementedError
+        ValueError
         -   Raised if the requested atlas is not supported.
         """
-        supported_atlases = ["AAL", "AAL3"]
-        if self.atlas_name not in supported_atlases:
-            raise NotImplementedError(
+        if self.atlas_name not in self.supported_atlases:
+            raise ValueError(
                 f"The requested atlas '{self.atlas_name}' is not recognised. "
-                f"The supported atlases are {supported_atlases}."
+                f"The supported atlases are {self.supported_atlases}."
             )
 
     def _load_data(self) -> None:
@@ -152,16 +152,15 @@ class AtlasBrowser:
         PARAMETERS
         ----------
         coordinates : numpy ndarray
-        -   An [n x 3] or [3, 0] matrix where n is the number of coordinates to
+        -   An [n x 3] or [3, 0] array where n is the number of coordinates to
             find regions for, and 3 the x-, y-, and z-axis coordinates,
             respectively.
         
         RETURNS
         -------
         coordinates : numpy ndarray
-        -   An [n x 3] matrix where n is the number of coordinates to
-            find regions for, and 3 the x-, y-, and z-axis coordinates,
-            respectively.
+        -   An [n x 3] array where n is the number of coordinates to find
+            regions for, and 3 the x-, y-, and z-axis coordinates, respectively.
 
         RAISES
         ------
@@ -179,7 +178,7 @@ class AtlasBrowser:
 
         if coordinates.ndim != 2:
             raise ValueError(
-                "'coordinates' should be an [n x 3] array, but it has "
+                "'coordinates' should have two dimensions, but it has "
                 f"{coordinates.ndim} dimensions."
             )
 
