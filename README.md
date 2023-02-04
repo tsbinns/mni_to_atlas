@@ -10,7 +10,7 @@ Example screenshot of the plotting:
 [See here for the list of requirements](requirements.txt).
 
 ## Use Example:
-1. Install the package into the desired environment using pip `pip install -i https://test.pypi.org/simple/ mni-to-atlas`
+1. Install the package into the desired environment using pip `pip install mni-to-atlas`
 2. Import the `AtlasBrowser` class from `mni_to_atlas` into your workspace, e.g. `from mni_to_atlas import AtlasBrowser`
 3. Create an instance of the `AtlasBrowser` class and specify an atlas to use, e.g. `atlas = AtlasBrowser("AAL3")`
 4. Provide MNI coordinates to the `AtlasBrowser` object to find the corresponding atlas regions, e.g. `regions = atlas.find_regions(coordinates)`, where coordinates is an [n x 3] numpy ndarray, where each row contains an x-, y-, and z-axis MNI coordinate. The `regions` output is a list of strings containing the region names for each set of coordinates
