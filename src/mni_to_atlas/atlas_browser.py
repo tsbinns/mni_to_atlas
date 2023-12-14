@@ -1,362 +1,310 @@
-"""A class for converting MNI coordinates to atlas regions."""
+"""Class for converting MNI coordinates to atlas regions."""
 
-from os.path import join as pathjoin
-import random
-import json
-import csv
+import os
+
 import nibabel as nib
 import numpy as np
-from matplotlib.figure import Figure
+import matplotlib
 from matplotlib import pyplot as plt
-from mni_to_atlas import atlases
+
+from mni_to_atlas.atlases import _ATLASES_PATH, _SUPPORTED_ATLASES
 
 
 class AtlasBrowser:
-    """A class for converting MNI coordinates to brain atlas regions, with basic
-    plotting functionality.
+    """Class for converting MNI coordinates to brain atlas regions.
 
-    PARAMETERS
+    Parameters
     ----------
     atlas : str
-    -   The name of the atlas to use.
-    -   Supported atlases are: "AAL" (automated anatomical labelling atlas [1]);
-        and "AAL3" (automated anatomical labeling atlas 3 [2]; 1x1x1 mm voxel
-        version).
+        The name of the atlas to use. Supported atlases are:
+        - "AAL" (automated anatomical labelling atlas [1])
+        - "AAL3" (automated anatomical labeling atlas 3 [2]; 1mm^3 voxel
+          version)
+        - "HCPEx" (Human Connectome Project extended parcellation atlas [3])
 
-    METHODS
+    Methods
     -------
     find_regions
-    -   Finds the regions associated with MNI coordinates for the atlas. If a
-        set of coordinates does not correspond to a mapped region, "undefined"
-        is returned.
+        Find the regions associated with MNI coordinates for the atlas.
 
-    NOTES
+    Notes
     -----
     References:
-        [1] Tzourio-Mazoyer et al. (2002), NeuroImage, 10.1006/nimg.2001.0978.
-        [2] Rolls et al. (2020), NeuroImage, 10.1016/j.neuroimage.2019.116189.
+    [1] Tzourio-Mazoyer et al. (2002) DOI: 10.1006/nimg.2001.0978
+    [2] Rolls et al. (2020) DOI: 10.1016/j.neuroimage.2019.116189
+    [3] Huang et al. (2022) DOI: 10.1007/s00429-021-02421-6
     """
 
-    ## Initialise class information
-    supported_atlases = ["AAL", "AAL3"]
-    _atlases_path = atlases.__path__[0]
+    _plotting_ready: bool = False
 
-    ### Initialise status attributes
-    _plotting_ready = False
-
-    ### Initialise attributes that will be filled with information
-    _atlas = None
-    _plotting_atlas = None
-    _conversion = None
-    _region_names = None
-    _region_colours = None
+    _image: np.ndarray = None
+    _plotting_image: np.ndarray = None
+    _affine: np.ndarray = None
+    _region_names: dict = None
+    _region_colours: dict = None
 
     def __init__(self, atlas: str) -> None:
-        ### Initialise inputs
         self.atlas_name = atlas
 
-        ### Begin work
         self._check_atlas()
         self._load_data()
 
-    def _check_atlas(self) -> None:
-        """Checks that the requested atlas is supported.
-
-        RAISES
-        ------
-        ValueError
-        -   Raised if the requested atlas is not supported.
-        """
-        if self.atlas_name not in self.supported_atlases:
+    def _check_atlas(self) -> None:  # noqa: D107
+        """Check that the requested atlas is supported."""
+        if self.atlas_name not in _SUPPORTED_ATLASES:
             raise ValueError(
-                f"The requested atlas '{self.atlas_name}' is not recognised. "
-                f"The supported atlases are {self.supported_atlases}."
+                f"The requested atlas '{self.atlas_name}' is not recognised.\n"
+                f"Supported atlases are: {_SUPPORTED_ATLASES}"
             )
 
     def _load_data(self) -> None:
-        """Loads the atlas and accompanying information into the object."""
-        self._path = pathjoin(self._atlases_path, self.atlas_name)
+        """Load the atlas and accompanying information."""
+        self._path = os.path.join(_ATLASES_PATH, self.atlas_name)
         self._load_atlas()
-        self._load_conversion()
         self._load_regions()
 
     def _load_atlas(self) -> None:
-        """Loads the atlas .nii file."""
-        self._atlas = nib.load(pathjoin(self._path, "atlas.nii")).get_fdata()
-
-    def _load_conversion(self) -> None:
-        """Loads the MNI to atlas coordinates conversion information."""
-        with open(
-            pathjoin(self._path, "conversion.json"), "r", encoding="utf8"
-        ) as file:
-            self._conversion = json.load(file)
+        """Load the atlas' nifti file."""
+        atlas = nib.load(self._path + ".nii")
+        self._image = np.array(atlas.get_fdata(), dtype=np.int32)
+        self._affine = atlas.affine
 
     def _load_regions(self) -> None:
-        """Loads the regions' IDs, names, and colour groups for the atlas."""
-        self._region_names = {}
-        self._region_colours = {}
-        with open(
-            pathjoin(self._path, "regions.csv"), encoding="utf8", mode="r"
-        ) as file:
-            contents = csv.reader(file, delimiter="\t")
-            for region_id, region_name, colour_group in contents:
-                region_id = int(region_id)
-                colour_group = int(colour_group)
-                self._region_names[region_id] = region_name
-                self._region_colours[region_id] = colour_group
+        """Load the regions' IDs, names, and colour groups for the atlas."""
+        self._region_names = {0: "Undefined"}
+
+        with open(self._path + ".txt", encoding="utf8", mode="r") as file:
+            for line in file:
+                columns = line.split()
+                self._region_names[int(columns[0])] = columns[1]
 
     def find_regions(
         self, coordinates: np.ndarray, plot: bool = False
     ) -> list[str]:
-        """Finds the regions associated with MNI coordinates for the atlas. If a
-        set of coordinates does not correspond to a mapped region, "undefined"
-        is returned.
+        """Find the regions associated with MNI coordinates for the atlas.
 
-        PARAMETERS
+        Parameters
         ----------
-        coordinates : numpy ndarray
-        -   MNI coordinates (in mm) to find the associated atlas regions for,
-            given as an [n x 3] matrix where n is the number of coordinates to
-            find regions for, and 3 the x-, y-, and z-axis coordinates,
+        coordinates : numpy.ndarray, shape (3, ) or (n, 3)
+            MNI coordinates (in mm) to find the associated atlas regions for,
+            given as an (n x 3) matrix where n is the number of coordinates
+            sets to find regions for, and 3 the x-, y-, and z-axis coordinates,
             respectively.
 
-        plot : bool; default False
-        -   Whether or not to plot a sagittal, coronal, and axial view of the
+        plot : bool (default False)
+            Whether or not to plot a sagittal, coronal, and axial view of the
             coordinate on the atlas.
 
-        RETURNS
+        Returns
         -------
-        regions : list[str]
-        -   Names of the regions in the atlas corresponding to the MNI
-            coordinates.
+        regions : list of str
+            Names of the regions in the atlas corresponding to `coordinates`.
+
+        Notes
+        -----
+        If an entry of `coordinates` does not correspond to a mapped region,
+        "Undefined" is returned.
         """
-        coordinates = self._check_coordinates(coordinates)
+        coordinates = self._sort_coordinates(coordinates)
         if plot and not self._plotting_ready:
             self._prepare_plotting()
 
-        regions = []
-        for coords in coordinates:
-            mni_coords = self._round_coords(coords)
-            atlas_coords = self._convert_coords(mni_coords)
-            region = self._find_region(atlas_coords)
-            regions.append(region)
-            if plot:
-                self._plot(atlas_coords, mni_coords, region)
+        mni_coords = np.round(coordinates).astype(np.int32)  # round to ints
+        atlas_coords = self._convert_mni_to_atlas_space(mni_coords)
+        regions = self._find_regions(atlas_coords)
+        if plot:
+            for atlas_coord, mni_coord, region in zip(
+                atlas_coords, mni_coords, regions
+            ):
+                self._plot_region(atlas_coord, mni_coord, region)
 
         return regions
 
-    def _check_coordinates(self, coordinates: np.ndarray) -> np.ndarray:
-        """Checks that each set of coordinates contains three values,
-        corresponding to the x-, y-, and z-coordinates.
+    def _sort_coordinates(self, coordinates: np.ndarray) -> np.ndarray:
+        """Check that coordinates are in the correct format.
 
-        PARAMETERS
+        Parameters
         ----------
-        coordinates : numpy ndarray
-        -   An [n x 3] or [3, 0] array where n is the number of coordinates to
-            find regions for, and 3 the x-, y-, and z-axis coordinates,
-            respectively.
-        
-        RETURNS
-        -------
-        coordinates : numpy ndarray
-        -   An [n x 3] array where n is the number of coordinates to find
-            regions for, and 3 the x-, y-, and z-axis coordinates, respectively.
+        coordinates
 
-        RAISES
-        ------
-        ValueError
-        -   Raised if 'coordinates' is not a numpy ndarray.
-        -   Raised if 'coordinates' has more than two dimensions.
-        -   Raised if the second dimension of 'coordinates' does not have a
-            length of 3.
+        Returns
+        -------
+        coordinates : numpy.ndarray, shape (n, 3)
+            The coordinates as an (n, 3) matrix.
         """
         if not isinstance(coordinates, np.ndarray):
-            raise TypeError("'coordinates' should be a numpy ndarray.")
-        
+            raise TypeError("`coordinates` must be a NumPy array.")
+
         if coordinates.ndim == 1 and coordinates.shape == (3,):
-            coordinates = coordinates.copy()[np.newaxis, :]
+            coordinates = coordinates[np.newaxis, :]
 
         if coordinates.ndim != 2:
             raise ValueError(
-                "'coordinates' should have two dimensions, but it has "
+                "`coordinates` must have two dimensions, but it has "
                 f"{coordinates.ndim} dimensions."
             )
 
         if coordinates.shape[1] != 3:
             raise ValueError(
-                "'coordinates' should be an [n x 3] array, but it is an "
-                f"[n x {coordinates.shape[1]}] array.")
-        
+                "'coordinates' should have shape (n, 3), but it has shape (n, "
+                f"{coordinates.shape[1]})."
+            )
+
         return coordinates
 
     def _prepare_plotting(self) -> None:
-        """Prepares the atlas for being plotted."""
-        plotting_atlas = self._atlas.copy()
-        plotting_atlas[plotting_atlas == 0] = np.nan  # provides a white...
-        # background to the empty regions of the plot
-        self._plotting_atlas = self._assign_colour_ids(plotting_atlas)
+        """Prepare the atlas for being plotted."""
+        plotting_image = self._image.copy().astype(np.float32)
+
+        # set white background to the empty regions of the plot
+        plotting_image[plotting_image == 0] = np.nan
+
+        self._plotting_image = self._assign_colour_ids(plotting_image)
         self._plotting_ready = True
 
-    def _assign_colour_ids(self, atlas: np.ndarray) -> np.ndarray:
-        """Shuffles the colour group values of regions belonging to the same
-        colour groups and assigns these new values to the plotting atlas as the
-        region IDs.
+    def _assign_colour_ids(self, image: np.ndarray) -> np.ndarray:
+        """Assign colours to the atlas regions.
 
-        PARAMETERS
+        Parameters
         ----------
-        atlas : numpy ndarray
-        -   A copy of the atlas.
+        image : numpy.ndarray
 
-        RETURNS
+        Returns
         -------
-        numpy ndarray
-        -   The atlas with region IDs reassigned based on the shuffled colour
+        coloured_image : numpy.ndarray
+            The image with region IDs reassigned based on the shuffled colour
             IDs.
 
-        NOTES
+        Notes
         -----
-        -   Shuffling the colour group values (mostly) ensures that neighbouring
-            regions have region IDs which are not just one value apart, which
-            when plotted leads to neighbouring regions having a very similar
-            colour which is difficult to distinguish between. Additionally,
-            grouping regions with belonging to the same regions, but in
-            different hemispheres, with the same colour group IDs means regions
-            share the same colour across both hemispheres.
+        Shuffling the colour group values (mostly) ensures that neighbouring
+        regions have IDs which are not just one value apart (which when plotted
+        leads to neighbouring regions having a similar colour that is difficult
+        to distinguish between).
+
+        Additionally, grouping the same regions in different hemispheres with
+        the same colour IDs means the colour is shared across both hemispheres.
         """
-        transformation = self._define_colour_reassignment()
+        colour_assignment = self._define_colour_assignment()
 
-        return self._reassign_colours(atlas, transformation)
+        return self._assign_colours(image, colour_assignment)
 
-    def _define_colour_reassignment(self) -> dict:
-        """Creates a dictionary that defines how the colour group IDs of regions
-        will be switched.
+    def _define_colour_assignment(self) -> dict:
+        """Define how the colour group IDs of regions will be assigned.
 
-        RETURNS
+        Returns
         -------
-        transformation : dict
-        -   Dictionary where the keys are the region IDs and the values are the
-            new colour IDs which will be used as the new region IDs..
+        colour_assignement : dict
+            Dictionary where the keys are the region IDs and the values are the
+            colour IDs which will be used as the new region IDs.
+
+        Notes
+        -----
+        The matching of regions across the hemispheres assumes that their names
+        are identical except for the final two characters which end either with
+        "_L" or "_R".
         """
-        random.seed(44)
-        colour_ids = np.unique(list(self._region_colours.values())).tolist()
-        shuffled_ids = random.sample(colour_ids, len(colour_ids))
-        transformation = {}
-        for region_id, colour_id in self._region_colours.items():
-            transformation[region_id] = shuffled_ids[colour_id - 1]
+        region_names = list(self._region_names.values())
+        region_names = [name for name in region_names if name != "Undefined"]
 
-        return transformation
+        unique_region_names = np.unique([name[:-2] for name in region_names])
+        colour_ids = np.arange(len(unique_region_names)) + 1
+        np.random.seed(40)
+        shuffled_colour_ids = colour_ids[
+            np.random.randint(0, len(colour_ids), len(colour_ids))
+        ]
 
-    def _reassign_colours(
-        self, atlas: np.ndarray, transformation: dict
+        colour_assignment = {}
+        for unique_name, colour in zip(
+            unique_region_names, shuffled_colour_ids
+        ):
+            for region_id, region_name in self._region_names.items():
+                if region_name.startswith(unique_name):
+                    colour_assignment[region_id] = colour
+
+        return colour_assignment
+
+    def _assign_colours(
+        self, image: np.ndarray, assignment: dict
     ) -> np.ndarray:
-        """Assigns new colour ID values as the region IDs in the atlas.
+        """Assign colour ID values as the region IDs in the image.
 
-        PARAMETERS
+        Parameters
         ----------
-        atlas : numpy ndarray
-        -   A copy of the atlas.
+        image : numpy.ndarray
 
-        transformation : dict
-        -   Dictionary where the keys are the original region IDs and the values
-            are the new region IDs.
+        assignment : dict
+            Dictionary where the keys are the original region IDs and the
+            values are the new region IDs (i.e. the colours).
 
-        RETURNS
+        Returns
         -------
-        numpy ndarray
-        -   The atlas with the new region IDs.
+        coloured_image : numpy.ndarray
+            The image with the new region IDs.
         """
-        atlas_1d = atlas.ravel()
-        for val_i, val in enumerate(atlas_1d):
-            if not np.isnan(val):
-                atlas_1d[val_i] = transformation[val]
+        coloured_image = image.copy()
+        for value in assignment.keys():
+            coloured_image[image == value] = assignment[value]
 
-        return atlas_1d.reshape(atlas.shape)
+        return coloured_image
 
-    def _convert_coords(self, mni_coords: np.ndarray) -> np.ndarray:
-        """Converts MNI coordinates (in mm) to atlas coordinates.
+    def _convert_mni_to_atlas_space(
+        self, mni_coords: np.ndarray
+    ) -> np.ndarray:
+        """Convert MNI coordinates to atlas coordinates.
 
-        PARAMETERS
+        Parameters
         ----------
-        mni_coords : numpy ndarray
-        -   MNI coordinates (in mm) as integers, consisting of an x-, y-, and
-            z-coordinate.
+        mni_coords : numpy.ndarray, shape (n, 3)
+            The MNI coordinates rounded to the nearest integer.
 
-        RETURNS
+        Returns
         -------
-        atlas_coords : numpy ndarray
-        -   Atlas coordinates consiting of an x-, y-, and z-coordinate.
-
-        NOTES
-        -----
-        -   The atlas only accepts coordinates in integers, and so MNI
-            coordinates must be rounded in the case of non-integer values before
-            finding the corresponding region.
+        atlas_coords : numpy.ndarray, shape (n, 3)
+            The corresponding atlas coordinates.
         """
-        return mni_coords + self._conversion
+        # Add column of ones to allow for affine transformation
+        extended_mni_coords = np.hstack(
+            (mni_coords, np.ones((mni_coords.shape[0], 1), dtype=np.int32))
+        )
+        atlas_coords = np.linalg.solve(self._affine, extended_mni_coords.T)
 
-    def _round_coords(self, coords: np.ndarray) -> np.ndarray:
-        """Rounds coordinates to the nearest integer.
+        return atlas_coords[:3, :].astype(np.int32).T
 
-        PARAMETERS
+    def _find_regions(self, atlas_coords: np.ndarray) -> str:
+        """Find the name of the regions in the atlas.
+
+        Parameters
         ----------
-        coords : numpy ndarray
-        -   A [1 x 3] array, consisting of an x-, y-, and z-coordinate.
+        atlas_coords : numpy.ndarray
+            Coordinates as an (n, 3) matrix in the atlas space.
 
-        RETURNS
+        Returns
         -------
-        rounded_coords : numpy ndarray
-        -   An array of length three, consisting of an x-, y-, and z-coordinate
-            rounded to their nearest integer.
+        regions : list of str
+            The name of the regions corresponding to the coordinates.
         """
-        rounded_coords = np.zeros((3,), dtype=int)
-        for coord_i, coord in enumerate(coords):
-            if coord < 0:
-                rounded = int(coord - 0.5)
-            else:
-                rounded = int(coord + 0.5)
-            rounded_coords[coord_i] = rounded
+        region_ids = self._image[
+            atlas_coords[:, 0], atlas_coords[:, 1], atlas_coords[:, 2]
+        ]
 
-        return rounded_coords
+        return [self._region_names[region_id] for region_id in region_ids]
 
-    def _find_region(self, atlas_coords: np.ndarray) -> str:
-        """Finds the name of the region in the atlas belonging to a set of
-        coordinates. If the coordinates do not correspond to a mapped region,
-        'undefined' is returned.
-
-        PARAMETERS
-        ----------
-        atlas_coords : numpy ndarray
-        -   A [1 x 3] array, consisting of an x-, y-, and z-coordinate.
-
-        RETURNS
-        -------
-        region : str
-        -   The name of the region corresponding to the coordinates.
-        """
-        region_id = int(self._atlas[*atlas_coords])
-        if region_id != 0:
-            region = self._region_names[region_id]
-        else:
-            region = "undefined"
-
-        return region
-
-    def _plot(
+    def _plot_region(
         self, atlas_coords: np.ndarray, mni_coords: np.ndarray, region: str
     ) -> None:
-        """Plots coordinates on the atlas in the sagittal, coronal, and axial
-        views.
+        """Plot a single set of x-, y-, and z-coordinates.
 
-        PARAMETERS
+        Parameters
         ----------
-        atlas_coords : numpy ndarray
-        -   Atlas coordinates, consisting of an x-, y-, and z-coordinate.
+        atlas_coords : numpy.ndarray
+            (1, 3) atlas coordinates.
 
-        mni_coords : numpy ndarray
-        -  The atlas coordinates in MNI space.
+        mni_coords : numpy.ndarray
+            (1, 3) MNI coordinates.
 
         region : str
-        -   The name of the region corresponding to the coordinates.
+            The name of the region corresponding to the coordinates.
         """
         fig, axes = plt.subplots(1, 3)
         self._plot_views(axes, atlas_coords)
@@ -366,17 +314,16 @@ class AtlasBrowser:
     def _plot_views(
         self, axes: list[plt.Axes], atlas_coords: np.ndarray
     ) -> None:
-        """Plots a sagittal, coronal, and axial view of atlas coordinates on a
-        set of axes.
+        """Plot a sagittal, coronal, and axial view of atlas coordinates.
 
-        PARAMETERS
+        Parameters
         ----------
-        axes : list[matplotlib pyplot Axes]
-        -   A list of three axes to plot the sagittal, coronal, and axial view
+        axes : list of matplotlib.pyplot.Axes
+            A list of three axes to plot the sagittal, coronal, and axial view
             of the coordinates, respectively.
 
-        atlas_coords : numpy ndarray
-        -   Atlas coordinates, consisting of an x-, y-, and z-coordinate.
+        atlas_coords : numpy.ndarray
+            Atlas coordinates, consisting of an x-, y-, and z-coordinate.
         """
         sagittal, coronal, axial = self._get_plot_views(atlas_coords)
         corrected_y, corrected_z = self._get_corrected_coords(atlas_coords)
@@ -396,151 +343,152 @@ class AtlasBrowser:
     def _get_plot_views(
         self, atlas_coords: np.ndarray
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Gets the sagittal, coronal, and axial views of the atlas at the
-        specified coordinates.
+        """Get the sagittal, coronal, and axial views of the atlas.
 
-        PARAMETERS
+        Parameters
         ----------
-        atlas_coords : numpy ndarray
-        -   Atlas coordinates, consisting of an x-, y-, and z-coordinate.
+        atlas_coords : numpy.ndarray
+            Atlas coordinates, consisting of an x-, y-, and z-coordinate.
 
-        RETURNS
+        Returns
         -------
-        sagittal : numpy ndarray
-        -   A 2D array containing the sagittal atlas view.
+        sagittal : numpy.ndarray
+            A 2D array containing the sagittal atlas view.
 
-        coronal : numpy ndarray
-        -   A 2D array containing the coronal atlas view.
+        coronal : numpy.ndarray
+            A 2D array containing the coronal atlas view.
 
-        axial : numpy ndarray
-        -   A 2D array containing the axial atlas view.
+        axial : numpy.ndarray
+            A 2D array containing the axial atlas view.
         """
-        sagittal = np.rot90(self._plotting_atlas[atlas_coords[0], :, :])
-        coronal = np.rot90(self._plotting_atlas[:, atlas_coords[1], :])
-        axial = np.rot90(self._plotting_atlas[:, :, atlas_coords[2]])
+        sagittal = np.rot90(self._plotting_image[atlas_coords[0], :, :])
+        coronal = np.rot90(self._plotting_image[:, atlas_coords[1], :])
+        axial = np.rot90(self._plotting_image[:, :, atlas_coords[2]])
 
         return sagittal, coronal, axial
 
     def _get_corrected_coords(
         self, atlas_coords: np.ndarray
     ) -> tuple[int, int]:
-        """Gets the corrected y- and z-coordinates used for plotting a marker of
-        the coordinate location on the plots.
+        """Get the corrected y- and z-coordinates for marking the coordinate.
 
-        PARAMETERS
+        Parameters
         ----------
-        atlas_coords : numpy ndarray
-        -   Atlas coordinates, consisting of an x-, y-, and z-coordinate.
+        atlas_coords : numpy.ndarray
+            Atlas coordinates, consisting of an x-, y-, and z-coordinate.
 
-        RETURNS
+        Returns
         -------
         corrected_y : int
-        -   The y-coordinate, corrected for the size of the plotted y-axis.
+            The y-coordinate, corrected for the size of the plotted y-axis.
 
         corrected_z : int
-        -   The z-coordinate, corrected for the size of the plotted z-axis.
+            The z-coordinate, corrected for the size of the plotted z-axis.
         """
-        corrected_y = self._plotting_atlas.shape[1] - atlas_coords[1]
-        corrected_z = self._plotting_atlas.shape[2] - atlas_coords[2]
+        corrected_y = self._plotting_image.shape[1] - atlas_coords[1]
+        corrected_z = self._plotting_image.shape[2] - atlas_coords[2]
 
         return corrected_y, corrected_z
 
     def _style_plot(
         self,
-        fig: Figure,
+        fig: matplotlib.figure.Figure,
         axes: list[plt.Axes],
         atlas_coords: np.ndarray,
         mni_coords: np.ndarray,
         region: str,
     ) -> None:
-        """Adds additional information to the subplots.
+        """Add additional information to the subplots.
 
-        PARAMETERS
+        Parameters
         ----------
-        fig : matplotlib Figure
-        -   The figure on which the subplots are plotted.
+        fig : matplotlib.figure.Figure
+            The figure to plot on.
 
-        axes : list[matplotlib pyplot Axes]
-        -   A list of three axes to plot the sagittal, coronal, and axial view
+        axes : list of matplotlib.pyplot.Axes
+            A list of three axes to plot the sagittal, coronal, and axial view
             of the coordinates, respectively.
 
-        atlas_coords : numpy ndarray
-        -   The coordinates in the atlas space.
+        atlas_coords : numpy.ndarray
+            The coordinates in the atlas space.
 
-        mni_coords : numpy ndarray
-        -   The coordinates in MNI space.
+        mni_coords : numpy.ndarray
+            The coordinates in MNI space.
 
         region : str
-        -   The name of the region corresponding to the coordinates.
+            The name of the region corresponding to the coordinates.
         """
         self._add_title(fig, region, mni_coords, atlas_coords)
         self._remove_subplot_axes(axes)
         self._add_orientation_labels(fig, axes)
 
     def _add_orientation_labels(
-        self, fig: Figure, axes: list[plt.Axes]
+        self, fig: matplotlib.figure.Figure, axes: list[plt.Axes]
     ) -> None:
-        """Adds labels to the sagittal, coronal, and axial views to show the
-        orientation of the subplots.
+        """Add labels to show the orientation of the subplots.
 
-        PARAMETERS
+        Parameters
         ----------
-        fig : matplotlib Figure
-        -   The figure on which the subplots are plotted.
+        fig : matplotlib.figure.Figure
+            The figure on which the subplots are plotted.
 
-        axes : list[matplotlib pyplot Axes]
-        -   A list of three axes to plot the sagittal, coronal, and axial view
+        axes : list of matplotlib.pyplot.Axes
+            A list of three axes to plot the sagittal, coronal, and axial view
             of the coordinates, respectively.
         """
         x_left, y_left, x_top, y_top = self._get_orientation_label_positions(
             axes
         )
+
         text_left = ["Posterior", "Left", "Left"]
         text_top = ["Dorsal", "Dorsal", "Anterior"]
+
         for axis_i in range(len(axes)):
+            # text to the left of subplots
             fig.text(
                 x_left[axis_i],
                 y_left,
                 text_left[axis_i],
                 verticalalignment="center",
                 horizontalalignment="center",
-            )  # text to the left of subplots
+            )
+            # text above subplots
             fig.text(
                 x_top[axis_i],
                 y_top,
                 text_top[axis_i],
                 verticalalignment="center",
                 horizontalalignment="center",
-            )  # text above subplots
+            )
 
     def _get_orientation_label_positions(
         self, axes: list[plt.Axes]
     ) -> tuple[np.ndarray, float, np.ndarray, float]:
-        """Gets the figure coordinates for the orientation labels that will be
-        added to the figure.
+        """Get the figure coordinates for the orientation labels.
 
-        PARAMETERS
+        Parameters
         ----------
-        axes : list[matplotlib pyplot Axes]
-        -   A list of three axes to plot the sagittal, coronal, and axial view
+        axes : list of matplotlib.pyplot.Axes
+            A list of three axes to plot the sagittal, coronal, and axial view
             of the coordinates, respectively.
 
-        RETURNS
+        Returns
         -------
-        x_left : numpy ndarray
-        -   Three x-coordinate figure positions, one for each subplot,
+        x_left : numpy.ndarray
+            Three x-coordinate figure positions, one for each subplot,
             corresponding to the left of each subplot.
 
         y_left : float
-        -   The average y-coordinate figure position of the center of each
+            The average y-coordinate figure position of the center of each
             subplot.
 
-        x_top : numpy ndarray
-        -   Three x-coordinate figure positions, one for each subplot,
+        x_top : numpy.ndarray
+            Three x-coordinate figure positions, one for each subplot,
             corresponding to the center of each subplot.
 
         y_top : float
-        -   The average y-coordinate figure position of the top of each subplot.
+            The average y-coordinate figure position of the top of each
+            subplot.
         """
         x_left = np.zeros((3,))
         y_left = np.zeros((3,))
@@ -552,7 +500,7 @@ class AtlasBrowser:
                 x_shift = 0.2
             else:
                 x_shift = 0
-            x_left[axis_i] = bounds[0] - bounds[0] * x_shift # x position
+            x_left[axis_i] = bounds[0] - bounds[0] * x_shift  # x position
             y_left[axis_i] = bounds[1] + (bounds[3] / 2)  # y position + half
             # height
             x_top[axis_i] = bounds[0] + (bounds[2] / 2)  # x position + half
@@ -565,41 +513,42 @@ class AtlasBrowser:
 
     def _add_title(
         self,
-        fig: Figure,
+        fig: matplotlib.figure.Figure,
         region: str,
         mni_coords: np.ndarray,
         atlas_coords: np.ndarray,
     ) -> None:
-        """Generates a title for the figure containing the MNI and atlas
-        coordinates, and the corresponding region.
+        """Generate a title for the figure.
 
-        PARAMETERS
+        Parameters
         ----------
-        fig : matplotlib Figure
-        -   The figure on which the subplots are plotted.
+        fig : matplotlib.figure.Figure
+            The figure on which the subplots are plotted.
 
         region : str
-        -   The name of the region corresponding to the coordinates.
+            The name of the region corresponding to the coordinates.
 
         mni_coords : numpy ndarray
-        -   The coordinates in MNI space.
+            The coordinates in MNI space.
 
         atlas_coords : numpy ndarray
-        -   The coordinates in the atlas space.
+            The coordinates in the atlas space.
         """
         title = (
-            f"Region: {region}     Atlas: {self.atlas_name}\nMNI coords.: "
-            f"{mni_coords.tolist()}     Atlas coords.: {atlas_coords.tolist()}"
+            f"Region: {region}     "
+            f"Atlas: {self.atlas_name}\n"
+            f"MNI coords.: {mni_coords.tolist()}     "
+            f"Atlas coords.: {(atlas_coords + 1).tolist()}"
         )
         fig.suptitle(title)
 
     def _remove_subplot_axes(self, axes: list[plt.Axes]) -> None:
-        """Removes the subplot axes from the figure.
+        """Remove the subplot axes from the figure.
 
-        PARAMETERS
+        Parameters
         ----------
-        axes : list[matplotlib pyplot Axes]
-        -   A list of three axes to plot the sagittal, coronal, and axial view
+        axes : list of matplotlib.pyplot.Axes
+            A list of three axes to plot the sagittal, coronal, and axial view
             of the coordinates, respectively.
         """
         for axis in axes:

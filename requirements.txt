@@ -1,4 +1,4 @@
-python>=3.9
+python>=3.11
 numpy>=1.22
 matplotlib>=3.5
 nibabel>=3.2
