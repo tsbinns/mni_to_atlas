@@ -3,14 +3,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "mni_to_atlas"
+name = "mni-to-atlas"
 version = "1.1.0"
 authors = [
     { name="Thomas Samuel Binns", email="t.s.binns@outlook.com" },
 ]
 description = "A simple Python-based tool for finding brain atlas regions based on MNI coordinates."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -24,8 +24,31 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = [
+    "pytest",
+    "coverage",
+    "flake8",
+    "black",
+    "codespell",
+    "pycodestyle",
+    "pydocstyle"
+]
 
 [project.urls]
 "Homepage" = "https://github.com/tsbinns/mni_to_atlas"
 "Bug Tracker" = "https://github.com/tsbinns/mni_to_atlas/issues"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    # Ignore warnings about matplotlib figures not being shown
+    'ignore:FigureCanvasAgg is non-interactive, and thus cannot be shown:UserWarning',
+]
+
+[tool.coverage.run]
+omit = [
+    "tests/*",
+    "__init__.py"
+]
+
+[tool.pydocstyle]
+match-dir = "^(?!(tests)).*"

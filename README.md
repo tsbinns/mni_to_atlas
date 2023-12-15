@@ -1,4 +1,4 @@
-# mni_to_atlas
+# mni-to-atlas
 A simple Python-based tool for finding brain atlas regions based on MNI coordinates, with basic plotting abilities to show the sagittal, coronal, and axial views of the coordinates on the atlas.
 
 The following atlases are currently supported:
@@ -6,8 +6,10 @@ The following atlases are currently supported:
 - Automated anatomical labelling 3 atlas (1mm<sup>3</sup> voxel version) [[2]](#References)
 - Human Connectome Project extended parcellation atlas [[3]](#References)
 
+If there is an atlas you would like to see added, please open an [issue](https://github.com/tsbinns/mni_to_atlas/issues).
+
 Example screenshot of the plotting:
-![image](https://user-images.githubusercontent.com/56922019/178039475-998e077b-482f-4fbe-94af-88e1891b493b.png)
+![image](docs/_static/example_plot.png)
 
 ## Requirements:
 [See here for the list of requirements](requirements.txt).

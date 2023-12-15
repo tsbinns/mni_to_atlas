@@ -2,52 +2,104 @@
 
 import pytest
 import numpy as np
+import matplotlib.pyplot as plt
+
 from mni_to_atlas import AtlasBrowser
+from mni_to_atlas.atlases import _SUPPORTED_ATLASES
+
+# Do not show plots when testing
+plt.switch_backend("Agg")
 
 
-class TestAtlasBrowser:
-    def test_invalid_atlas(self):
-        with pytest.raises(ValueError, match="The requested atlas"):
-            AtlasBrowser("Not An Atlas")
+@pytest.mark.parametrize("name", _SUPPORTED_ATLASES)
+def test_init_runs(name: str):
+    """Test AtlasBrowser initialisation."""
+    AtlasBrowser(name)
 
-    def test_invalid_coordinates_type(self):
-        with pytest.raises(TypeError, match="'coordinates' should be a numpy"):
-            AtlasBrowser("AAL").find_regions([44, 44, 44])
 
-    def test_invalid_coordinates_ndim(self):
-        with pytest.raises(ValueError, match="'coordinates' should have two"):
-            AtlasBrowser("AAL").find_regions(np.zeros((1, 3, 1)))
+def test_init_error_catch():
+    """Test AtlasBrowser initialisation errors caught."""
+    incorrect_name = "Not an atlas"
+    with pytest.raises(
+        ValueError,
+        match=f"The requested atlas '{incorrect_name}' is not recognised.",
+    ):
+        AtlasBrowser(incorrect_name)
 
-    def test_invalid_coordinates_shape(self):
-        with pytest.raises(
-            ValueError, match=r"'coordinates' should be an \[n x 3\]"
-        ):
-            AtlasBrowser("AAL").find_regions(np.full((1, 4), 44))
 
-    def test_vector_coordinates(self):
-        AtlasBrowser("AAL").find_regions(np.full((3,), 44))
+@pytest.mark.parametrize(
+    "inputs",
+    [
+        ["AAL", np.array([40, 0, 60]), ["Frontal_Mid_R"]],
+        ["AAL3", np.array([40, 0, 60]), ["Frontal_Mid_2_R"]],
+        ["HCPEx", np.array([40, 0, 60]), ["Inferior_6-8_Transitional_Area_R"]],
+        [
+            "AAL",
+            np.array([[40, 0, 60], [0, 0, 0]]),
+            ["Frontal_Mid_R", "Undefined"],
+        ],
+        [
+            "AAL3",
+            np.array([[40, 0, 60], [0, 0, 0]]),
+            ["Frontal_Mid_2_R", "Undefined"],
+        ],
+        [
+            "HCPEx",
+            np.array([[40, 0, 60], [0, 0, 0]]),
+            ["Inferior_6-8_Transitional_Area_R", "Undefined"],
+        ],
+    ],
+)
+@pytest.mark.parametrize("plot", [False, True])
+def test_find_regions_runs(
+    inputs: tuple[str, np.ndarray, list[str]], plot: bool
+):
+    """Test that `find_regions` returns the correct region(s).
 
-    def test_multiple_coordinates(self):
-        coordinates = np.full((2, 3), 44)
-        regions = AtlasBrowser("AAL").find_regions(coordinates)
-        assert len(regions) == coordinates.shape[0], (
-            "The number of returned regions does not match the number of "
-            "supplied coordinates"
-        )
+    Parameters
+    ----------
+    inputs : tuple
+        The atlas name, coordinates, and expected region(s), respectively.
 
-    def test_defined_region(self):
-        regions = AtlasBrowser("AAL").find_regions(np.array([40, 0, 60]))
-        # Correct region found using MRIcron
-        # (https://www.nitrc.org/projects/mricron)
-        assert regions == ["Frontal_Mid_R"], "The region is not correct."
+    plot : bool
+        Whether to plot the results.
 
-    def test_undefined_region(self):
-        regions = AtlasBrowser("AAL").find_regions(np.full((1, 3), 0))
-        assert regions == ["undefined"], "The region is not undefined."
+    Notes
+    -----
+    Correct regions were found using MRIcron
+    (https://www.nitrc.org/projects/mricron).
+    """
+    atlas = AtlasBrowser(inputs[0])
+    assert atlas.find_regions(inputs[1], plot=plot) == inputs[2]
 
-    def test_supported_atlases(self):
-        for atlas_name in AtlasBrowser.supported_atlases:
-            AtlasBrowser(atlas_name).find_regions(np.full((1, 3), 44))
 
-    def test_plotting(self):
-        AtlasBrowser("AAL").find_regions(np.full((1, 3), 44), plot=True)
+def test_find_regions_error_cach():
+    """Test that errors are caught for `find_regions`."""
+    atlas = AtlasBrowser("AAL")  # atlas type is irrelevant
+
+    coords_list = [[40, 0, 60]]
+    with pytest.raises(
+        TypeError,
+        match="`coordinates` must be a NumPy array.",
+    ):
+        atlas.find_regions(coords_list)
+
+    coords_3d = np.array([[40, 0, 60]])[:, np.newaxis]
+    with pytest.raises(
+        ValueError,
+        match=(
+            "`coordinates` must have two dimensions, but it has "
+            f"{coords_3d.ndim} dimensions."
+        ),
+    ):
+        atlas.find_regions(coords_3d)
+
+    coords_n_by_4 = np.array([[40, 0, 60, 0]])
+    with pytest.raises(
+        ValueError,
+        match=(
+            r"'coordinates' must have shape \(n, 3\), but it has shape \(n, "
+            rf"{coords_n_by_4.shape[1]}\)."
+        ),
+    ):
+        atlas.find_regions(coords_n_by_4)

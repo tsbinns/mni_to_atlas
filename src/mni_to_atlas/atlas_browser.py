@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 from mni_to_atlas.atlases import _ATLASES_PATH, _SUPPORTED_ATLASES
 
 
-class AtlasBrowser:
+class AtlasBrowser:  # noqa: D414
     """Class for converting MNI coordinates to brain atlas regions.
 
     Parameters
@@ -41,15 +41,14 @@ class AtlasBrowser:
     _plotting_image: np.ndarray = None
     _affine: np.ndarray = None
     _region_names: dict = None
-    _region_colours: dict = None
 
-    def __init__(self, atlas: str) -> None:
+    def __init__(self, atlas: str) -> None:  # noqa: D107
         self.atlas_name = atlas
 
         self._check_atlas()
         self._load_data()
 
-    def _check_atlas(self) -> None:  # noqa: D107
+    def _check_atlas(self) -> None:
         """Check that the requested atlas is supported."""
         if self.atlas_name not in _SUPPORTED_ATLASES:
             raise ValueError(
@@ -146,7 +145,7 @@ class AtlasBrowser:
 
         if coordinates.shape[1] != 3:
             raise ValueError(
-                "'coordinates' should have shape (n, 3), but it has shape (n, "
+                "'coordinates' must have shape (n, 3), but it has shape (n, "
                 f"{coordinates.shape[1]})."
             )
 
@@ -267,6 +266,7 @@ class AtlasBrowser:
         extended_mni_coords = np.hstack(
             (mni_coords, np.ones((mni_coords.shape[0], 1), dtype=np.int32))
         )
+        # np.linalg.solve faster than taking inverse of affine and multiplying
         atlas_coords = np.linalg.solve(self._affine, extended_mni_coords.T)
 
         return atlas_coords[:3, :].astype(np.int32).T
