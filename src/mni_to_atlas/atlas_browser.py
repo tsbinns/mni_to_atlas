@@ -300,7 +300,7 @@ class AtlasBrowser:
         PARAMETERS
         ----------
         coords : numpy ndarray
-        -   A [1 x 3] array, consisting of an x-, y-, and z-coordinate.
+        -   A [3, ] array, consisting of an x-, y-, and z-coordinate.
 
         RETURNS
         -------
@@ -326,14 +326,16 @@ class AtlasBrowser:
         PARAMETERS
         ----------
         atlas_coords : numpy ndarray
-        -   A [1 x 3] array, consisting of an x-, y-, and z-coordinate.
+        -   A [3, ] array, consisting of an x-, y-, and z-coordinate.
 
         RETURNS
         -------
         region : str
         -   The name of the region corresponding to the coordinates.
         """
-        region_id = int(self._atlas[*atlas_coords])
+        region_id = int(
+            self._atlas[atlas_coords[0], atlas_coords[1], atlas_coords[2]]
+        )
         if region_id != 0:
             region = self._region_names[region_id]
         else:
