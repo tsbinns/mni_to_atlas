@@ -90,26 +90,31 @@ class AtlasBrowser:  # noqa: D414
 
         Returns
         -------
-        projected_coordinates : numpy.ndarray, shape (n, 3)
+        projected_coordinates : numpy.ndarray, shape (3, ) or (n, 3)
             The projected MNI coordinates.
         """
+        coordinates_ndim = coordinates.ndim
         coordinates = self._sort_coordinates(coordinates)
         mni_coords = coordinates.astype(np.int32)  # round to ints
         atlas_coords = self._convert_mni_to_atlas_space(mni_coords)
 
         projected_atlas_coords = []
-        defined_coords = np.nonzero(self._image)
+        defined_coords = np.argwhere(self._image != 0)
         for coord in atlas_coords:
             if self._image[coord[0], coord[1], coord[2]] != 0:
                 projected_atlas_coords.append(coord)
             else:
                 nearest_coord_idx = np.argmin(
-                    np.linalg.norm(coord - defined_coords, axis=1)
+                    np.linalg.norm(coord[np.newaxis, :] - defined_coords, axis=1)
                 )
                 projected_atlas_coords.append(defined_coords[nearest_coord_idx])
         projected_atlas_coords = np.array(projected_atlas_coords)
 
-        return self._convert_atlas_to_mni_space(projected_atlas_coords)
+        projected_mni_coords = self._convert_atlas_to_mni_space(projected_atlas_coords)
+        if coordinates_ndim == 1:
+            projected_mni_coords = projected_mni_coords[0]
+
+        return projected_mni_coords
 
     def find_regions(self, coordinates: np.ndarray, plot: bool = False) -> list[str]:
         """Find the regions associated with MNI coordinates for the atlas.
@@ -316,7 +321,7 @@ class AtlasBrowser:  # noqa: D414
             (atlas_coords, np.ones((atlas_coords.shape[0], 1), dtype=np.int32))
         )
         # np.linalg.solve faster than taking inverse of affine and multiplying
-        mni_coords = np.linalg.solve(self._affine, extended_mni_coords.T)
+        mni_coords = np.linalg.solve(np.linalg.inv(self._affine), extended_mni_coords.T)
 
         return mni_coords[:3, :].astype(np.int32).T
 
