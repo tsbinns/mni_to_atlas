@@ -36,8 +36,8 @@ def test_init_error_catch():
         ["AAL3", np.array([[40, 0, 60], [0, 0, 0]]), ["Frontal_Mid_2_R", "Undefined"]],
         [
             "HCPEx",
-            np.array([[40, 0, 60], [0, 0, 0]]),
-            ["Inferior_6-8_Transitional_Area_R", "Undefined"],
+            np.array([[39, -1, 57], [0, 0, 0]]),
+            ["Frontal_Eye_Fields_R", "Undefined"],
         ],
     ],
 )
@@ -62,13 +62,59 @@ def test_find_regions_runs(inputs: tuple[str, np.ndarray, list[str]], plot: bool
     assert atlas.find_regions(inputs[1], plot=plot) == inputs[2]
 
 
-def test_find_regions_error_cach():
-    """Test that errors are caught for `find_regions`."""
+@pytest.mark.parametrize(
+    "inputs",
+    [
+        ["AAL", np.array([40, 0, 60]), np.array([40, 0, 60])],
+        ["AAL3", np.array([40, 0, 60]), np.array([40, 0, 60])],
+        ["HCPEx", np.array([40, 0, 60]), np.array([40, 0, 60])],
+        [
+            "AAL",
+            np.array([[40, 0, 60], [40, 0, 67]]),
+            np.array([[40, 0, 60], [40, 0, 66]]),
+        ],
+        [
+            "AAL3",
+            np.array([[40, 0, 60], [40, 0, 65]]),
+            np.array([[40, 0, 60], [40, 0, 64]]),
+        ],
+        [
+            "HCPEx",
+            np.array([[39, -1, 57], [39, -1, 62]]),
+            np.array([[39, -1, 57], [38, -1, 62]]),
+        ],
+    ],
+)
+def test_project_to_nearest_runs(inputs: tuple[str, np.ndarray, np.ndarray]):
+    """Test that `project_to_nearest` projects coordinates to the correct region(s).
+
+    Parameters
+    ----------
+    inputs : tuple
+        The atlas name, coordinates, and projected coordinates, respectively.
+
+    Notes
+    -----
+    Correct regions were found using MRIcron
+    (https://www.nitrc.org/projects/mricron).
+    """
+    atlas = AtlasBrowser(inputs[0])
+    coords = atlas.project_to_nearest(inputs[1])
+    assert np.array_equal(coords, inputs[2])
+
+
+@pytest.mark.parametrize("method", ["find_regions", "project_to_nearest"])
+def test_error_catch(method):
+    """Test that errors are caught for `find_regions` and `project_to_nearest`."""
     atlas = AtlasBrowser("AAL")  # atlas type is irrelevant
+    if method == "find_regions":
+        meth = atlas.find_regions
+    else:
+        meth = atlas.project_to_nearest
 
     coords_list = [[40, 0, 60]]
     with pytest.raises(TypeError, match="`coordinates` must be a NumPy array."):
-        atlas.find_regions(coords_list)
+        meth(coords_list)
 
     coords_3d = np.array([[40, 0, 60]])[:, np.newaxis]
     with pytest.raises(
@@ -78,7 +124,7 @@ def test_find_regions_error_cach():
             f"{coords_3d.ndim} dimensions."
         ),
     ):
-        atlas.find_regions(coords_3d)
+        meth(coords_3d)
 
     coords_n_by_4 = np.array([[40, 0, 60, 0]])
     with pytest.raises(
@@ -88,4 +134,4 @@ def test_find_regions_error_cach():
             rf"{coords_n_by_4.shape[1]}\)."
         ),
     ):
-        atlas.find_regions(coords_n_by_4)
+        meth(coords_n_by_4)
