@@ -1,45 +1,66 @@
 [build-system]
-requires = ["hatchling"]
 build-backend = "hatchling.build"
+requires = ["hatchling"]
 
 [project]
-name = "mni-to-atlas"
-version = "1.2.0dev"
-authors = [{ name = "Thomas Samuel Binns", email = "t.s.binns@outlook.com" }]
+authors = [{email = "t.s.binns@outlook.com", name = "Thomas Samuel Binns"}]
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+]
+dependencies = ["matplotlib >= 3.5", "nibabel >= 3.2", "numpy >= 1.22"]
 description = "A simple Python-based tool for finding brain atlas regions based on MNI coordinates."
+name = "mni-to-atlas"
 readme = "README.md"
 requires-python = ">=3.10"
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-]
-
-dependencies = ["numpy >= 1.22", "matplotlib >= 3.5", "nibabel >= 3.2"]
+version = "1.2.0dev"
 
 [project.optional-dependencies]
-dev = [
-    "pytest",
-    "coverage",
-    "flake8",
-    "black",
-    "codespell",
-    "pycodestyle",
-    "pydocstyle",
+lint = [
+  "codespell",
+  "isort",
+  "pre-commit",
+  "pydocstyle",
+  "pydocstyle[toml]",
+  "ruff",
+  "toml-sort",
+  "yamllint",
 ]
+test = ["coverage", "pytest"]
 
 [project.urls]
-"Homepage" = "https://github.com/tsbinns/mni_to_atlas"
 "Bug Tracker" = "https://github.com/tsbinns/mni_to_atlas/issues"
+"Homepage" = "https://github.com/tsbinns/mni_to_atlas"
 
-[tool.pytest.ini_options]
-filterwarnings = [
-    # Ignore warnings about matplotlib figures not being shown
-    'ignore:FigureCanvasAgg is non-interactive, and thus cannot be shown:UserWarning',
-]
+[tool.coverage.report]
+show_missing = true
 
 [tool.coverage.run]
-omit = ["tests/*", "__init__.py"]
+command_line = "-m pytest -v tests"
+omit = ["__init__.py", "tests/*"]
+source = ["mni_to_atlas"]
+
+[tool.isort]
+profile = "black"
 
 [tool.pydocstyle]
 match-dir = "^(?!(tests)).*"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+  # Ignore warnings about matplotlib figures not being shown
+  'ignore:FigureCanvasAgg is non-interactive, and thus cannot be shown:UserWarning',
+]
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint.per-file-ignores]
+"*.py" = ["E203", "E741"]
+"__init__.py" = ["F401"]
+
+[tool.tomlsort]
+all = true
+ignore_case = true
+trailing_comma_inline_array = true
