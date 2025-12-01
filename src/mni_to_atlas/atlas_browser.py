@@ -77,9 +77,7 @@ class AtlasBrowser:  # noqa: D414
                 columns = line.split()
                 self._region_names[int(columns[0])] = columns[1]
 
-    def find_regions(
-        self, coordinates: np.ndarray, plot: bool = False
-    ) -> list[str]:
+    def find_regions(self, coordinates: np.ndarray, plot: bool = False) -> list[str]:
         """Find the regions associated with MNI coordinates for the atlas.
 
         Parameters
@@ -214,18 +212,14 @@ class AtlasBrowser:  # noqa: D414
         ]
 
         colour_assignment = {}
-        for unique_name, colour in zip(
-            unique_region_names, shuffled_colour_ids
-        ):
+        for unique_name, colour in zip(unique_region_names, shuffled_colour_ids):
             for region_id, region_name in self._region_names.items():
                 if region_name.startswith(unique_name):
                     colour_assignment[region_id] = colour
 
         return colour_assignment
 
-    def _assign_colours(
-        self, image: np.ndarray, assignment: dict
-    ) -> np.ndarray:
+    def _assign_colours(self, image: np.ndarray, assignment: dict) -> np.ndarray:
         """Assign colour ID values as the region IDs in the image.
 
         Parameters
@@ -247,9 +241,7 @@ class AtlasBrowser:  # noqa: D414
 
         return coloured_image
 
-    def _convert_mni_to_atlas_space(
-        self, mni_coords: np.ndarray
-    ) -> np.ndarray:
+    def _convert_mni_to_atlas_space(self, mni_coords: np.ndarray) -> np.ndarray:
         """Convert MNI coordinates to atlas coordinates.
 
         Parameters
@@ -311,9 +303,7 @@ class AtlasBrowser:  # noqa: D414
         self._style_plot(fig, axes, atlas_coords, mni_coords, region)
         plt.show()
 
-    def _plot_views(
-        self, axes: list[plt.Axes], atlas_coords: np.ndarray
-    ) -> None:
+    def _plot_views(self, axes: list[plt.Axes], atlas_coords: np.ndarray) -> None:
         """Plot a sagittal, coronal, and axial view of atlas coordinates.
 
         Parameters
@@ -328,17 +318,11 @@ class AtlasBrowser:  # noqa: D414
         sagittal, coronal, axial = self._get_plot_views(atlas_coords)
         corrected_y, corrected_z = self._get_corrected_coords(atlas_coords)
         axes[0].imshow(sagittal, interpolation="none", vmin=0)
-        axes[0].scatter(
-            atlas_coords[1], corrected_z, marker="X", s=100, color="r"
-        )
+        axes[0].scatter(atlas_coords[1], corrected_z, marker="X", s=100, color="r")
         axes[1].imshow(coronal, interpolation="none", vmin=0)
-        axes[1].scatter(
-            atlas_coords[0], corrected_z, marker="X", s=100, color="r"
-        )
+        axes[1].scatter(atlas_coords[0], corrected_z, marker="X", s=100, color="r")
         axes[2].imshow(axial, interpolation="none", vmin=0)
-        axes[2].scatter(
-            atlas_coords[0], corrected_y, marker="X", s=100, color="r"
-        )
+        axes[2].scatter(atlas_coords[0], corrected_y, marker="X", s=100, color="r")
 
     def _get_plot_views(
         self, atlas_coords: np.ndarray
@@ -367,9 +351,7 @@ class AtlasBrowser:  # noqa: D414
 
         return sagittal, coronal, axial
 
-    def _get_corrected_coords(
-        self, atlas_coords: np.ndarray
-    ) -> tuple[int, int]:
+    def _get_corrected_coords(self, atlas_coords: np.ndarray) -> tuple[int, int]:
         """Get the corrected y- and z-coordinates for marking the coordinate.
 
         Parameters
@@ -436,9 +418,7 @@ class AtlasBrowser:  # noqa: D414
             A list of three axes to plot the sagittal, coronal, and axial view
             of the coordinates, respectively.
         """
-        x_left, y_left, x_top, y_top = self._get_orientation_label_positions(
-            axes
-        )
+        x_left, y_left, x_top, y_top = self._get_orientation_label_positions(axes)
 
         text_left = ["Posterior", "Left", "Left"]
         text_top = ["Dorsal", "Dorsal", "Anterior"]

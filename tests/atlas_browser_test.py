@@ -21,8 +21,7 @@ def test_init_error_catch():
     """Test AtlasBrowser initialisation errors caught."""
     incorrect_name = "Not an atlas"
     with pytest.raises(
-        ValueError,
-        match=f"The requested atlas '{incorrect_name}' is not recognised.",
+        ValueError, match=f"The requested atlas '{incorrect_name}' is not recognised."
     ):
         AtlasBrowser(incorrect_name)
 
@@ -33,16 +32,8 @@ def test_init_error_catch():
         ["AAL", np.array([40, 0, 60]), ["Frontal_Mid_R"]],
         ["AAL3", np.array([40, 0, 60]), ["Frontal_Mid_2_R"]],
         ["HCPEx", np.array([40, 0, 60]), ["Inferior_6-8_Transitional_Area_R"]],
-        [
-            "AAL",
-            np.array([[40, 0, 60], [0, 0, 0]]),
-            ["Frontal_Mid_R", "Undefined"],
-        ],
-        [
-            "AAL3",
-            np.array([[40, 0, 60], [0, 0, 0]]),
-            ["Frontal_Mid_2_R", "Undefined"],
-        ],
+        ["AAL", np.array([[40, 0, 60], [0, 0, 0]]), ["Frontal_Mid_R", "Undefined"]],
+        ["AAL3", np.array([[40, 0, 60], [0, 0, 0]]), ["Frontal_Mid_2_R", "Undefined"]],
         [
             "HCPEx",
             np.array([[40, 0, 60], [0, 0, 0]]),
@@ -51,9 +42,7 @@ def test_init_error_catch():
     ],
 )
 @pytest.mark.parametrize("plot", [False, True])
-def test_find_regions_runs(
-    inputs: tuple[str, np.ndarray, list[str]], plot: bool
-):
+def test_find_regions_runs(inputs: tuple[str, np.ndarray, list[str]], plot: bool):
     """Test that `find_regions` returns the correct region(s).
 
     Parameters
@@ -78,10 +67,7 @@ def test_find_regions_error_cach():
     atlas = AtlasBrowser("AAL")  # atlas type is irrelevant
 
     coords_list = [[40, 0, 60]]
-    with pytest.raises(
-        TypeError,
-        match="`coordinates` must be a NumPy array.",
-    ):
+    with pytest.raises(TypeError, match="`coordinates` must be a NumPy array."):
         atlas.find_regions(coords_list)
 
     coords_3d = np.array([[40, 0, 60]])[:, np.newaxis]
