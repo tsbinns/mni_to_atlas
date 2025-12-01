@@ -178,9 +178,10 @@ class AtlasBrowser:  # noqa: D414
         if ndim == 1 and coordinates.shape == (3,):
             coordinates = coordinates[np.newaxis, :]
 
-        if ndim != 2:
+        if coordinates.ndim != 2:
             raise ValueError(
-                f"`coordinates` must have two dimensions, but it has {ndim} dimensions."
+                "`coordinates` must have two dimensions, but it has "
+                f"{coordinates.ndim} dimensions."
             )
 
         if coordinates.shape[1] != 3:
