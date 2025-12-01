@@ -14,7 +14,7 @@ description = "A simple Python-based tool for finding brain atlas regions based 
 name = "mni-to-atlas"
 readme = "README.md"
 requires-python = ">=3.10"
-version = "1.2.0dev"
+version = "1.2.0"
 
 [project.optional-dependencies]
 lint = [
