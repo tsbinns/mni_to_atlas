@@ -22,21 +22,31 @@ Example screenshot of the plotting:
    - The coordinates should be an (n x 3) array, where each row contains an x-, y-, and z-axis MNI coordinate. 
    - By default, plotting the coordinates is not performed, however this can be changed by setting `plot = True` in the `find_regions` method. In this case, a figure will be generated for each set of coordinates.
 
+In case your MNI coordinates do not correspond to a defined atlas region (e.g., the coordinates correspond to electrodes above the brain surface), the `project_to_nearest` method can be used to project the coordinates to the nearest defined atlas region, before finding the brain regions.
+
 <br>
 
 ```python
 # Import the AtlasBrowser class
 from mni_to_atlas import AtlasBrowser
+import numpy as np
 
 # Instantiate the AtlasBrowser class and specify the atlas to use
 atlas = AtlasBrowser("AAL3")
 
-# Provide MNI coordinates as an (n x 3) array
+# Define MNI coordinates as an (n x 3) array
 coordinates = np.array([[-24, -53, 73],
-                        [-25, 20, 78]])
+                        [-25, 20, 70]])
 
 # Find the brain regions at the MNI coordinates (plotting is optional)
 regions = atlas.find_regions(coordinates, plot=True)
+assert regions == ["Parietal_Sup_L", "Undefined"]
+
+# Project 'undefined' coordinates to the nearest defined atlas region
+projected_coords = atlas.project_to_nearest(coordinates)
+projected_regions = atlas.find_regions(projected_coords)
+assert np.all(projected_coords == np.array([[-24, -53, 73], [-24, 18, 66]]))
+assert projected_regions == ["Parietal_Sup_L", "Frontal_Sup_2_L"]
 ```
 
 ## References:

@@ -77,6 +77,44 @@ class AtlasBrowser:  # noqa: D414
                 columns = line.split()
                 self._region_names[int(columns[0])] = columns[1]
 
+    def project_to_nearest(self, coordinates: np.ndarray) -> np.ndarray:
+        """Project MNI coordinates to the nearest defined region in the atlas.
+
+        Parameters
+        ----------
+        coordinates : numpy.ndarray, shape (3, ) or (n, 3)
+            MNI coordinates (in mm) to find the associated atlas regions for,
+            given as an (n x 3) matrix where n is the number of coordinate
+            sets to find regions for, and 3 the x-, y-, and z-axis coordinates,
+            respectively.
+
+        Returns
+        -------
+        projected_coordinates : numpy.ndarray, shape (3, ) or (n, 3)
+            The projected MNI coordinates.
+        """
+        coordinates, coordinates_ndim = self._sort_coordinates(coordinates)
+        mni_coords = coordinates.astype(np.int32)  # round to ints
+        atlas_coords = self._convert_mni_to_atlas_space(mni_coords)
+
+        projected_atlas_coords = []
+        defined_coords = np.argwhere(self._image != 0)
+        for coord in atlas_coords:
+            if self._image[coord[0], coord[1], coord[2]] != 0:
+                projected_atlas_coords.append(coord)
+            else:
+                nearest_coord_idx = np.argmin(
+                    np.linalg.norm(coord[np.newaxis, :] - defined_coords, axis=1)
+                )
+                projected_atlas_coords.append(defined_coords[nearest_coord_idx])
+        projected_atlas_coords = np.array(projected_atlas_coords)
+
+        projected_mni_coords = self._convert_atlas_to_mni_space(projected_atlas_coords)
+        if coordinates_ndim == 1:
+            projected_mni_coords = projected_mni_coords[0]
+
+        return projected_mni_coords
+
     def find_regions(self, coordinates: np.ndarray, plot: bool = False) -> list[str]:
         """Find the regions associated with MNI coordinates for the atlas.
 
@@ -84,7 +122,7 @@ class AtlasBrowser:  # noqa: D414
         ----------
         coordinates : numpy.ndarray, shape (3, ) or (n, 3)
             MNI coordinates (in mm) to find the associated atlas regions for,
-            given as an (n x 3) matrix where n is the number of coordinates
+            given as an (n x 3) matrix where n is the number of coordinate
             sets to find regions for, and 3 the x-, y-, and z-axis coordinates,
             respectively.
 
@@ -100,13 +138,14 @@ class AtlasBrowser:  # noqa: D414
         Notes
         -----
         If an entry of `coordinates` does not correspond to a mapped region,
-        "Undefined" is returned.
+        "Undefined" is returned. To avoid this, use the `project_to_nearest`
+        method to first project coordinates to the nearest defined region.
         """
-        coordinates = self._sort_coordinates(coordinates)
+        coordinates, _ = self._sort_coordinates(coordinates)
         if plot and not self._plotting_ready:
             self._prepare_plotting()
 
-        mni_coords = np.round(coordinates).astype(np.int32)  # round to ints
+        mni_coords = coordinates.astype(np.int32)  # round to ints
         atlas_coords = self._convert_mni_to_atlas_space(mni_coords)
         regions = self._find_regions(atlas_coords)
         if plot:
@@ -117,7 +156,7 @@ class AtlasBrowser:  # noqa: D414
 
         return regions
 
-    def _sort_coordinates(self, coordinates: np.ndarray) -> np.ndarray:
+    def _sort_coordinates(self, coordinates: np.ndarray) -> tuple[np.ndarray, int]:
         """Check that coordinates are in the correct format.
 
         Parameters
@@ -128,11 +167,15 @@ class AtlasBrowser:  # noqa: D414
         -------
         coordinates : numpy.ndarray, shape (n, 3)
             The coordinates as an (n, 3) matrix.
+
+        ndim : int
+            The original number of dimensions of `coordinates`.
         """
         if not isinstance(coordinates, np.ndarray):
             raise TypeError("`coordinates` must be a NumPy array.")
+        ndim = coordinates.ndim
 
-        if coordinates.ndim == 1 and coordinates.shape == (3,):
+        if ndim == 1 and coordinates.shape == (3,):
             coordinates = coordinates[np.newaxis, :]
 
         if coordinates.ndim != 2:
@@ -147,7 +190,7 @@ class AtlasBrowser:  # noqa: D414
                 f"{coordinates.shape[1]})."
             )
 
-        return coordinates
+        return coordinates, ndim
 
     def _prepare_plotting(self) -> None:
         """Prepare the atlas for being plotted."""
@@ -262,6 +305,28 @@ class AtlasBrowser:  # noqa: D414
         atlas_coords = np.linalg.solve(self._affine, extended_mni_coords.T)
 
         return atlas_coords[:3, :].astype(np.int32).T
+
+    def _convert_atlas_to_mni_space(self, atlas_coords: np.ndarray) -> np.ndarray:
+        """Convert atlas coordinates to MNI coordinates.
+
+        Parameters
+        ----------
+        atlas_coords : numpy.ndarray, shape (n, 3)
+            The atlas coordinates rounded to the nearest integer.
+
+        Returns
+        -------
+        mni_coords : numpy.ndarray, shape (n, 3)
+            The corresponding MNI coordinates.
+        """
+        # Add column of ones to allow for affine transformation
+        extended_mni_coords = np.hstack(
+            (atlas_coords, np.ones((atlas_coords.shape[0], 1), dtype=np.int32))
+        )
+        # np.linalg.solve faster than taking inverse of affine and multiplying
+        mni_coords = np.linalg.solve(np.linalg.inv(self._affine), extended_mni_coords.T)
+
+        return mni_coords[:3, :].astype(np.int32).T
 
     def _find_regions(self, atlas_coords: np.ndarray) -> str:
         """Find the name of the regions in the atlas.
