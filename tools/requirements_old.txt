@@ -1,0 +1,8 @@
+# Oldest-supported dependency versions
+numpy == 1.22
+matplotlib == 3.5
+nibabel == 3.2
+# Test dependencies
+coverage
+pytest
+pooch>=1.3
