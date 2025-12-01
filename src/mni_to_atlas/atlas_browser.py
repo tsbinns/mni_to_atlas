@@ -93,8 +93,7 @@ class AtlasBrowser:  # noqa: D414
         projected_coordinates : numpy.ndarray, shape (3, ) or (n, 3)
             The projected MNI coordinates.
         """
-        coordinates_ndim = coordinates.ndim
-        coordinates = self._sort_coordinates(coordinates)
+        coordinates, coordinates_ndim = self._sort_coordinates(coordinates)
         mni_coords = coordinates.astype(np.int32)  # round to ints
         atlas_coords = self._convert_mni_to_atlas_space(mni_coords)
 
@@ -142,7 +141,7 @@ class AtlasBrowser:  # noqa: D414
         "Undefined" is returned. To avoid this, use the `project_to_nearest`
         method to first project coordinates to the nearest defined region.
         """
-        coordinates = self._sort_coordinates(coordinates)
+        coordinates, _ = self._sort_coordinates(coordinates)
         if plot and not self._plotting_ready:
             self._prepare_plotting()
 
@@ -157,7 +156,7 @@ class AtlasBrowser:  # noqa: D414
 
         return regions
 
-    def _sort_coordinates(self, coordinates: np.ndarray) -> np.ndarray:
+    def _sort_coordinates(self, coordinates: np.ndarray) -> tuple[np.ndarray, int]:
         """Check that coordinates are in the correct format.
 
         Parameters
@@ -168,17 +167,20 @@ class AtlasBrowser:  # noqa: D414
         -------
         coordinates : numpy.ndarray, shape (n, 3)
             The coordinates as an (n, 3) matrix.
+
+        ndim : int
+            The original number of dimensions of `coordinates`.
         """
         if not isinstance(coordinates, np.ndarray):
             raise TypeError("`coordinates` must be a NumPy array.")
+        ndim = coordinates.ndim
 
-        if coordinates.ndim == 1 and coordinates.shape == (3,):
+        if ndim == 1 and coordinates.shape == (3,):
             coordinates = coordinates[np.newaxis, :]
 
-        if coordinates.ndim != 2:
+        if ndim != 2:
             raise ValueError(
-                "`coordinates` must have two dimensions, but it has "
-                f"{coordinates.ndim} dimensions."
+                f"`coordinates` must have two dimensions, but it has {ndim} dimensions."
             )
 
         if coordinates.shape[1] != 3:
@@ -187,7 +189,7 @@ class AtlasBrowser:  # noqa: D414
                 f"{coordinates.shape[1]})."
             )
 
-        return coordinates
+        return coordinates, ndim
 
     def _prepare_plotting(self) -> None:
         """Prepare the atlas for being plotted."""
